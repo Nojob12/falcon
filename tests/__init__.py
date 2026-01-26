@@ -1,3 +1,3 @@
 """
-Tests for CrowdStrike Falcon Search Library
+Falcon Search Library Tests
 """

@@ -23,7 +23,6 @@ class FalconConfig:
         """
         self.client_id = client_id or os.getenv("FALCON_CLIENT_ID")
         self.client_secret = client_secret or os.getenv("FALCON_CLIENT_SECRET")
-        self.base_url = base_url
 
         if not self.client_id or not self.client_secret:
             raise FalconConfigurationError(
@@ -41,5 +40,4 @@ class FalconConfig:
         return {
             "client_id": self.client_id,
             "client_secret": self.client_secret,
-            "base_url": self.base_url
         }

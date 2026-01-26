@@ -1,51 +1,77 @@
 """
-Tests for config module
+Tests for FalconConfig class
 """
+import pytest
 import os
-import unittest
 from falcon.config import FalconConfig
 from falcon.exceptions import FalconConfigurationError
 
 
-class TestFalconConfig(unittest.TestCase):
-    """Tests for FalconConfig class"""
+class TestFalconConfig:
+    """Test FalconConfig initialization and methods"""
 
-    def test_config_with_explicit_credentials(self):
-        """Test creating config with explicit credentials"""
+    def test_init_with_parameters(self, valid_credentials):
+        """Test initialization with explicit parameters"""
         config = FalconConfig(
-            client_id="test_client_id",
-            client_secret="test_client_secret",
-            base_url="https://api.crowdstrike.com"
+            client_id=valid_credentials["client_id"],
+            client_secret=valid_credentials["client_secret"]
         )
-        self.assertEqual(config.client_id, "test_client_id")
-        self.assertEqual(config.client_secret, "test_client_secret")
-        self.assertEqual(config.base_url, "https://api.crowdstrike.com")
+        assert config.client_id == valid_credentials["client_id"]
+        assert config.client_secret == valid_credentials["client_secret"]
 
-    def test_config_with_default_base_url(self):
-        """Test creating config with default base_url"""
-        config = FalconConfig(
-            client_id="test_client_id",
-            client_secret="test_client_secret"
-        )
-        self.assertEqual(config.client_id, "test_client_id")
-        self.assertEqual(config.client_secret, "test_client_secret")
-        self.assertEqual(config.base_url, "auto")
+    def test_init_with_env_variables(self, monkeypatch, valid_credentials):
+        """Test initialization with environment variables"""
+        monkeypatch.setenv("FALCON_CLIENT_ID", valid_credentials["client_id"])
+        monkeypatch.setenv("FALCON_CLIENT_SECRET", valid_credentials["client_secret"])
+        
+        config = FalconConfig()
+        assert config.client_id == valid_credentials["client_id"]
+        assert config.client_secret == valid_credentials["client_secret"]
 
-    def test_to_dict(self):
-        """Test converting config to dictionary"""
+    def test_init_missing_client_id(self, monkeypatch):
+        """Test that initialization fails when client_id is missing"""
+        monkeypatch.delenv("FALCON_CLIENT_ID", raising=False)
+        monkeypatch.delenv("FALCON_CLIENT_SECRET", raising=False)
+        
+        with pytest.raises(FalconConfigurationError) as exc_info:
+            FalconConfig(client_secret="test_secret")
+        
+        assert "Client IDとClient Secretが必要です" in str(exc_info.value)
+
+    def test_init_missing_client_secret(self, monkeypatch):
+        """Test that initialization fails when client_secret is missing"""
+        monkeypatch.delenv("FALCON_CLIENT_ID", raising=False)
+        monkeypatch.delenv("FALCON_CLIENT_SECRET", raising=False)
+        
+        with pytest.raises(FalconConfigurationError) as exc_info:
+            FalconConfig(client_id="test_id")
+        
+        assert "Client IDとClient Secretが必要です" in str(exc_info.value)
+
+    def test_init_missing_both_credentials(self, monkeypatch):
+        """Test that initialization fails when both credentials are missing"""
+        monkeypatch.delenv("FALCON_CLIENT_ID", raising=False)
+        monkeypatch.delenv("FALCON_CLIENT_SECRET", raising=False)
+        
+        with pytest.raises(FalconConfigurationError):
+            FalconConfig()
+
+    def test_to_dict(self, valid_credentials):
+        """Test to_dict method returns correct dictionary"""
         config = FalconConfig(
-            client_id="test_id",
-            client_secret="test_secret",
-            base_url="https://api.crowdstrike.com"
+            client_id=valid_credentials["client_id"],
+            client_secret=valid_credentials["client_secret"]
         )
         
         config_dict = config.to_dict()
-        self.assertEqual(config_dict, {
-            "client_id": "test_id",
-            "client_secret": "test_secret",
-            "base_url": "https://api.crowdstrike.com"
-        })
+        assert config_dict["client_id"] == valid_credentials["client_id"]
+        assert config_dict["client_secret"] == valid_credentials["client_secret"]
 
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_parameter_priority_over_env(self, monkeypatch):
+        """Test that explicit parameters take priority over environment variables"""
+        monkeypatch.setenv("FALCON_CLIENT_ID", "env_id")
+        monkeypatch.setenv("FALCON_CLIENT_SECRET", "env_secret")
+        
+        config = FalconConfig(client_id="param_id", client_secret="param_secret")
+        assert config.client_id == "param_id"
+        assert config.client_secret == "param_secret"

@@ -29,7 +29,6 @@ class FalconSearchClient:
             config = FalconConfig(
                 client_id=client_id,
                 client_secret=client_secret,
-                base_url=base_url
             )
 
         self.config = config
