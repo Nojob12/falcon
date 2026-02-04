@@ -2,7 +2,7 @@
 MCP Server instance and configuration
 
 This module initializes the FastMCP server and registers all tools
-with the client manager for tenant-based CrowdStrike API access.
+with the client manager for customer-based CrowdStrike API access.
 """
 from fastmcp import FastMCP
 from .client_manager import ClientManager
@@ -13,7 +13,7 @@ from .tools.get_file_hash_by_filename import register_get_file_hash_tool
 # Create the MCP instance
 mcp = FastMCP("LLMEDR CrowdStrike MCP Server")
 
-# Create the client manager for tenant-based client instances
+# Create the client manager for customer-based client instances
 client_manager = ClientManager()
 
 

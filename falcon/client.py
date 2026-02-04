@@ -40,22 +40,22 @@ class FalconSearchClient:
     def search_events(
         self,
         query: str,
-        start_time: str,
-        end_time: str,
-        limit: int = 10000,
-        poll_interval: int = 5,
-        max_wait_time: int = 300
+        repository: str = "search-all",
+        start: str = "15m",
+        is_live: bool = False,
+        interval: int = 5,
+        max_retries: int = 60
     ) -> List[Dict[str, Any]]:
         """
         イベントを検索する
 
         Args:
-            query: 検索クエリ (例: "event_simpleName='ProcessRollup2'")
-            start_time: 検索開始時刻 (ISO8601形式またはエポック秒)
-            end_time: 検索終了時刻 (ISO8601形式またはエポック秒)
-            limit: 取得する最大イベント数
-            poll_interval: ポーリング間隔(秒)
-            max_wait_time: 最大待機時間(秒)
+            query: クエリ文字列。CrowdStrikeAPIに渡す。
+            repository: CrowdStrikeの検索対象のリポジトリを決める項目。デフォルト値は"search-all"。
+            start: 直近から過去どれくらいまでを検索範囲にするか決める項目。s,m,hで指定する。デフォルト値は"15m"。
+            is_live: デフォルト値はFalse。不明な項目だがAPIを叩く時に指定する必要がある。
+            interval: ポーリングするまでのインターバルを決める秒数。
+            max_retries: 最大何回検索を試行するかを決める回数。
 
         Returns:
             イベントのリスト
@@ -65,11 +65,11 @@ class FalconSearchClient:
         """
         return self.event_search.search_events(
             query=query,
-            start_time=start_time,
-            end_time=end_time,
-            limit=limit,
-            poll_interval=poll_interval,
-            max_wait_time=max_wait_time
+            repository=repository,
+            start=start,
+            is_live=is_live,
+            interval=interval,
+            max_retries=max_retries
         )
 
     # --- アラート検索関連メソッド ---

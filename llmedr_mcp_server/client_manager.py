@@ -1,7 +1,7 @@
 """
 CrowdStrike Client Manager
 
-Manages CrowdStrike API client instances per tenant.
+Manages CrowdStrike API client instances per customer.
 Creates clients on-demand and maintains them for reuse.
 """
 import os
@@ -12,9 +12,9 @@ from falcon.config import FalconConfig
 
 class ClientManager:
     """
-    Manages CrowdStrike API client instances for multiple tenants.
+    Manages CrowdStrike API client instances for multiple customers.
     
-    Each tenant has its own client instance that is created on-demand
+    Each customer has its own client instance that is created on-demand
     and reused for subsequent requests.
     """
     
@@ -22,53 +22,53 @@ class ClientManager:
         """Initialize the client manager with an empty client registry"""
         self._clients: Dict[str, FalconSearchClient] = {}
     
-    def get_client(self, tenant_code: str) -> FalconSearchClient:
+    def get_client(self, customer_code: str) -> FalconSearchClient:
         """
-        Get or create a CrowdStrike client for the specified tenant.
+        Get or create a CrowdStrike client for the specified customer.
         
         Args:
-            tenant_code: Unique identifier for the tenant
+            customer_code: Unique identifier for the customer
             
         Returns:
-            FalconSearchClient instance for the tenant
+            FalconSearchClient instance for the customer
             
         Raises:
-            ValueError: If tenant credentials are not configured
+            ValueError: If customer credentials are not configured
         """
         # Return existing client if available
-        if tenant_code in self._clients:
-            return self._clients[tenant_code]
+        if customer_code in self._clients:
+            return self._clients[customer_code]
         
-        # Create new client for this tenant
-        client = self._create_client(tenant_code)
-        self._clients[tenant_code] = client
+        # Create new client for this customer
+        client = self._create_client(customer_code)
+        self._clients[customer_code] = client
         
         return client
     
-    def _create_client(self, tenant_code: str) -> FalconSearchClient:
+    def _create_client(self, customer_code: str) -> FalconSearchClient:
         """
-        Create a new CrowdStrike client instance for a tenant.
+        Create a new CrowdStrike client instance for a customer.
         
         Args:
-            tenant_code: Unique identifier for the tenant
+            customer_code: Unique identifier for the customer
             
         Returns:
             New FalconSearchClient instance
             
         Raises:
-            ValueError: If tenant credentials are not found in environment
+            ValueError: If customer credentials are not found in environment
         """
         # Get credentials from environment variables
-        # Format: FALCON_CLIENT_ID_<TENANT_CODE> and FALCON_CLIENT_SECRET_<TENANT_CODE>
-        client_id_key = f"FALCON_CLIENT_ID_{tenant_code.upper()}"
-        client_secret_key = f"FALCON_CLIENT_SECRET_{tenant_code.upper()}"
+        # Format: FALCON_CLIENT_ID_<CUSTOMER_CODE> and FALCON_CLIENT_SECRET_<CUSTOMER_CODE>
+        client_id_key = f"FALCON_CLIENT_ID_{customer_code.upper()}"
+        client_secret_key = f"FALCON_CLIENT_SECRET_{customer_code.upper()}"
         
         client_id = os.getenv(client_id_key)
         client_secret = os.getenv(client_secret_key)
         
         if not client_id or not client_secret:
             raise ValueError(
-                f"Credentials not found for tenant '{tenant_code}'. "
+                f"Credentials not found for customer '{customer_code}'. "
                 f"Please set environment variables: {client_id_key} and {client_secret_key}"
             )
         
@@ -80,20 +80,20 @@ class ClientManager:
         
         return FalconSearchClient(config=config)
     
-    def remove_client(self, tenant_code: str) -> bool:
+    def remove_client(self, customer_code: str) -> bool:
         """
-        Remove a client instance for a tenant.
+        Remove a client instance for a customer.
         
         Args:
-            tenant_code: Unique identifier for the tenant
+            customer_code: Unique identifier for the customer
             
         Returns:
             True if client was removed, False if it didn't exist
         """
-        if tenant_code in self._clients:
+        if customer_code in self._clients:
             # Close the client before removing
-            self._clients[tenant_code].close()
-            del self._clients[tenant_code]
+            self._clients[customer_code].close()
+            del self._clients[customer_code]
             return True
         return False
     

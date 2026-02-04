@@ -7,6 +7,7 @@ CrowdStrike Falcon検索ライブラリ
 from .client import FalconSearchClient
 from .search import FalconEventSearch, FalconAlertSearch
 from .config import FalconConfig
+from .query import Query, CaseCondition
 from .exceptions import (
     FalconSearchError,
     FalconAPIError,
@@ -26,6 +27,10 @@ __all__ = [
     # Search classes
     "FalconEventSearch",
     "FalconAlertSearch",
+
+    # Query builder
+    "Query",
+    "CaseCondition",
 
     # Configuration
     "FalconConfig",

@@ -1,10 +1,10 @@
 # LLMEDR CrowdStrike MCP Server
 
-A Model Context Protocol (MCP) server for automated CrowdStrike alert analysis with multi-tenant support.
+A Model Context Protocol (MCP) server for automated CrowdStrike alert analysis with multi-customer support.
 
 ## Features
 
-- **Multi-tenant Support**: Manage separate CrowdStrike API clients for each tenant
+- **Multi-customer Support**: Manage separate CrowdStrike API clients for each customer
 - **Automatic Client Management**: Client instances are created on-demand and reused
 - **Async Tools**: All tools are async for efficient API communication
 - **Alert Analysis**: Retrieve and analyze CrowdStrike alerts and events
@@ -16,7 +16,7 @@ llmedr_mcp_server/
 ├── __init__.py              # Package initialization
 ├── main.py                  # Entry point
 ├── server.py                # MCP instance and initialization
-├── client_manager.py        # Tenant-based CrowdStrike client manager
+├── client_manager.py        # Customer-based CrowdStrike client manager
 ├── requirements.txt         # Dependencies
 ├── .env.example             # Environment configuration template
 ├── tools/                   # MCP tool implementations
@@ -34,28 +34,28 @@ cd /Users/nojob/WorkSpace/falcon
 pip install -r llmedr_mcp_server/requirements.txt
 ```
 
-2. Configure tenant credentials:
+2. Configure customer credentials:
 ```bash
 cp llmedr_mcp_server/.env.example llmedr_mcp_server/.env
-# Edit .env and add your tenant credentials
+# Edit .env and add your customer credentials
 ```
 
 ## Configuration
 
-Each tenant requires two environment variables:
+Each customer requires two environment variables:
 
-- `FALCON_CLIENT_ID_<TENANT_CODE>`: CrowdStrike Client ID
-- `FALCON_CLIENT_SECRET_<TENANT_CODE>`: CrowdStrike Client Secret
+- `FALCON_CLIENT_ID_<CUSTOMER_CODE>`: CrowdStrike Client ID
+- `FALCON_CLIENT_SECRET_<CUSTOMER_CODE>`: CrowdStrike Client Secret
 
 **Example:**
 ```bash
-# Tenant: tenant1
-export FALCON_CLIENT_ID_TENANT1="abc123..."
-export FALCON_CLIENT_SECRET_TENANT1="xyz789..."
+# Customer: customer1
+export FALCON_CLIENT_ID_CUSTOMER1="abc123..."
+export FALCON_CLIENT_SECRET_CUSTOMER1="xyz789..."
 
-# Tenant: tenant2
-export FALCON_CLIENT_ID_TENANT2="def456..."
-export FALCON_CLIENT_SECRET_TENANT2="uvw012..."
+# Customer: customer2
+export FALCON_CLIENT_ID_CUSTOMER2="def456..."
+export FALCON_CLIENT_SECRET_CUSTOMER2="uvw012..."
 ```
 
 ## Usage
@@ -73,14 +73,14 @@ python -m llmedr_mcp_server.main
 Retrieve alert information from CrowdStrike by alert ID.
 
 **Parameters:**
-- `tenant_code` (str): Tenant identifier (e.g., 'tenant1')
+- `customer_code` (str): Customer identifier (e.g., 'customer1')
 - `alert_id` (str): CrowdStrike alert ID
 
 **Returns:** Alert details dictionary or None if not found
 
 **Example:**
 ```python
-result = await get_alert("tenant1", "ldt:abc123:1234567890")
+result = await get_alert("customer1", "ldt:abc123:1234567890")
 ```
 
 ### 2. get_file_hash_by_filename
@@ -88,7 +88,7 @@ result = await get_alert("tenant1", "ldt:abc123:1234567890")
 Query CrowdStrike for events containing file hashes by filename.
 
 **Parameters:**
-- `tenant_code` (str): Tenant identifier
+- `customer_code` (str): Customer identifier
 - `filename` (str): Filename to search for
 - `start_time` (str): Search start time (ISO8601 or epoch seconds)
 - `end_time` (str): Search end time (ISO8601 or epoch seconds)
@@ -99,7 +99,7 @@ Query CrowdStrike for events containing file hashes by filename.
 **Example:**
 ```python
 events = await get_file_hash_by_filename(
-    "tenant1",
+    "customer1",
     "malware.exe",
     "2024-01-01T00:00:00Z",
     "2024-01-31T23:59:59Z"
@@ -109,12 +109,12 @@ events = await get_file_hash_by_filename(
 ## Client Management
 
 The `ClientManager` automatically:
-1. Creates CrowdStrike client instances when first requested for a tenant
+1. Creates CrowdStrike client instances when first requested for a customer
 2. Reuses existing client instances for subsequent requests
 3. Manages client lifecycle and cleanup
 
-When an LLM sends a request with a `tenant_code`, the server:
-- Checks if a client exists for that tenant
+When an LLM sends a request with a `customer_code`, the server:
+- Checks if a client exists for that customer
 - Creates a new client if needed (using environment variables)
 - Returns the client instance to the tool for API calls
 
@@ -124,7 +124,7 @@ When an LLM sends a request with a `tenant_code`, the server:
 Contains the FastMCP instance and tool registration. When the MCP server receives a request, tools use the `client_manager` to get appropriate CrowdStrike clients.
 
 ### client_manager.py
-Manages CrowdStrike API client instances per tenant. Responsible for:
+Manages CrowdStrike API client instances per customer. Responsible for:
 - Creating new clients on-demand
 - Maintaining client registry
 - Handling client cleanup
@@ -135,7 +135,7 @@ Each tool is in its own file:
 - **get_file_hash_by_filename.py**: Queries events for file hashes
 
 All tools are async functions that:
-1. Receive `tenant_code` as first parameter
+1. Receive `customer_code` as first parameter
 2. Get CrowdStrike client from `client_manager`
 3. Execute API calls
 4. Return results
@@ -150,9 +150,9 @@ To add new tools:
 ```python
 def register_my_tool(mcp, client_manager):
     @mcp.tool()
-    async def my_tool(tenant_code: str, param: str) -> dict:
+    async def my_tool(customer_code: str, param: str) -> dict:
         """Tool description"""
-        client = client_manager.get_client(tenant_code)
+        client = client_manager.get_client(customer_code)
         # Use client to call CrowdStrike API
         return result
 ```
