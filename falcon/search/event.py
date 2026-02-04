@@ -39,22 +39,22 @@ class FalconEventSearch:
     def search_events(
         self,
         query: str,
-        start_time: str,
-        end_time: str,
-        limit: int = 10000,
-        poll_interval: int = 5,
-        max_wait_time: int = 300
+        repository: str = "search-all",
+        start: str = "15m",
+        is_live: bool = False,
+        interval: int = 5,
+        max_retries: int = 60
     ) -> List[Dict[str, Any]]:
         """
         イベントを検索する
 
         Args:
-            query: 検索クエリ (例: "event_simpleName='ProcessRollup2'")
-            start_time: 検索開始時刻 (ISO8601形式またはエポック秒)
-            end_time: 検索終了時刻 (ISO8601形式またはエポック秒)
-            limit: 取得する最大イベント数
-            poll_interval: ポーリング間隔(秒)
-            max_wait_time: 最大待機時間(秒)
+            query: クエリ文字列。CrowdStrikeAPIに渡す。
+            repository: CrowdStrikeの検索対象のリポジトリを決める項目。デフォルト値は"search-all"。
+            start: 直近から過去どれくらいまでを検索範囲にするか決める項目。s,m,hで指定する。デフォルト値は"15m"。
+            is_live: デフォルト値はFalse。不明な項目だがAPIを叩く時に指定する必要がある。
+            interval: ポーリングするまでのインターバルを決める秒数。
+            max_retries: 最大何回検索を試行するかを決める回数。
 
         Returns:
             イベントのリスト
@@ -64,28 +64,28 @@ class FalconEventSearch:
             FalconAPIError: API呼び出しに失敗した場合
         """
         # 検索を開始
-        search_id = self._start_search(query, start_time, end_time, limit)
+        search_id = self._start_search(query, repository, start, is_live)
 
         # 検索結果を取得
-        events = self._get_search_results(search_id, poll_interval, max_wait_time)
+        events = self._get_search_results(search_id, interval, max_retries)
 
         return events
 
     def _start_search(
         self,
         query: str,
-        start_time: str,
-        end_time: str,
-        limit: int
+        repository: str,
+        start: str,
+        is_live: bool
     ) -> str:
         """
         検索を開始する
 
         Args:
             query: 検索クエリ
-            start_time: 検索開始時刻
-            end_time: 検索終了時刻
-            limit: 取得する最大イベント数
+            repository: 検索対象のリポジトリ
+            start: 検索範囲（例: "15m", "1h"）
+            is_live: ライブ検索フラグ
 
         Returns:
             検索ID
@@ -98,9 +98,9 @@ class FalconEventSearch:
         try:
             response = self.client.start_search_v1(
                 filter=query,
-                start=start_time,
-                end=end_time,
-                limit=limit
+                repo_or_view=repository,
+                start=start,
+                is_live=is_live
             )
 
             # ステータスコードのチェック
@@ -136,16 +136,16 @@ class FalconEventSearch:
     def _get_search_results(
         self,
         search_id: str,
-        poll_interval: int,
-        max_wait_time: int
+        interval: int,
+        max_retries: int
     ) -> List[Dict[str, Any]]:
         """
         検索結果を取得する
 
         Args:
             search_id: 検索ID
-            poll_interval: ポーリング間隔(秒)
-            max_wait_time: 最大待機時間(秒)
+            interval: ポーリング間隔(秒)
+            max_retries: 最大試行回数
 
         Returns:
             イベントのリスト
@@ -154,11 +154,11 @@ class FalconEventSearch:
             FalconEventSearchError: 検索結果の取得に失敗した場合
             FalconAPIError: API呼び出しに失敗した場合
         """
-        elapsed_time = 0
+        retry_count = 0
         events = []
 
         try:
-            while elapsed_time < max_wait_time:
+            while retry_count < max_retries:
                 response = self.client.get_search_status_v1(ids=search_id)
 
                 # ステータスコードのチェック
@@ -173,8 +173,8 @@ class FalconEventSearch:
 
                 resources = response.get("body", {}).get("resources", [])
                 if not resources:
-                    time.sleep(poll_interval)
-                    elapsed_time += poll_interval
+                    time.sleep(interval)
+                    retry_count += 1
                     continue
 
                 search_status = resources[0]
@@ -189,14 +189,14 @@ class FalconEventSearch:
                     raise FalconEventSearchError(f"検索がエラーで終了しました: {error_msg}")
                 elif status in ["RUNNING", "PENDING"]:
                     # まだ実行中
-                    time.sleep(poll_interval)
-                    elapsed_time += poll_interval
+                    time.sleep(interval)
+                    retry_count += 1
                 else:
                     raise FalconEventSearchError(f"不明なステータス: {status}")
 
-            if elapsed_time >= max_wait_time:
+            if retry_count >= max_retries:
                 raise FalconEventSearchError(
-                    f"検索がタイムアウトしました({max_wait_time}秒)"
+                    f"検索がタイムアウトしました({max_retries}回の試行)"
                 )
 
             return events
