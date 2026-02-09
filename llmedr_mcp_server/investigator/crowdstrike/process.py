@@ -115,6 +115,45 @@ class ProcessInvestigation(InvestigationBase):
 
         return await self.execute_query(query, **search_params)
 
+    async def get_process_details_by_pid(
+        self,
+        process_id: str,
+        aid: str,
+        **search_params
+    ) -> List[Dict[str, Any]]:
+        """
+        プロセスIDからプロセス内容を取得
+
+        Args:
+            process_id: ターゲットプロセスID
+            aid: ホストID（必須）
+            **search_params: 検索パラメータ
+
+        Returns:
+            検索結果のリスト
+
+        使用例:
+            proc_inv = ProcessInvestigation(client)
+            details = await proc_inv.get_process_details_by_pid(
+                "40612979432",
+                aid="2e5445246a35d55"
+            )
+            for process in details:
+                print(f"プロセス名: {process.get('FileName')}")
+                print(f"コマンドライン: {process.get('CommandLine')}")
+                print(f"親プロセス: {process.get('ParentBaseFileName')}")
+        """
+        query = Query()
+        query.add("aid", aid)
+        query.add("TargetProcessId", process_id)
+        query.contain("#event_simpleName", "ProcessRollup2")
+        query.select([
+            "timestamp", "aid", "FilePath", "FileName", "TargetProcessId",
+            "CommandLine", "ParentBaseFileName", "ParentProcessId"
+        ])
+
+        return await self.execute_query(query, **search_params)
+
     # ========================================
     # プロセス系統関連（将来拡張）
     # ========================================
