@@ -844,4 +844,74 @@ class MCPTool(ToolBase):
                     "error": str(e)
                 }
 
+        # ========================================
+        # getCompressedFileOperation: 圧縮ファイル操作取得ツール
+        # ========================================
+        @mcp.tool()
+        async def getCompressedFileOperation(
+            customer_id: str,
+            host_id: str,
+            search_period: str = "1d"
+        ) -> dict:
+            """
+            Search for compressed file operations on a specific host.
+
+            Use this tool to identify compressed file activity (zip, rar, 7z, tar, etc.)
+            on a host. This is essential for detecting data exfiltration attempts,
+            malware packaging, or suspicious file compression activities that may
+            indicate attacker behavior.
+
+            Args:
+                customer_id: Customer/tenant identifier (e.g., "customer_001")
+                host_id: CrowdStrike Agent ID (aid) of the target host
+                search_period: Time range to search (default: "1d"). Format: "1h", "24h", "7d", "30d"
+
+            Returns:
+                Dict with total_results count and results list containing:
+                host_id, file_name, file_path, process_name, command_line, timestamp per compressed file operation
+            """
+            try:
+                # 1. ClientManagerを使って顧客コード毎のFalconClientを取得
+                client = client_manager.get_client(customer_id)
+
+                # 2. FileInvestigationクラスを使って圧縮ファイル操作ログを取得
+                file_inv = FileInvestigation(client)
+                compressed_operations = await file_inv.search_compressed_file_operations(
+                    aid=host_id,
+                    start=search_period
+                )
+
+                if not compressed_operations:
+                    return {
+                        "success": False,
+                        "error": f"No compressed file operations found on host: {host_id}"
+                    }
+
+                # 3. ログ情報を返す
+                results = []
+                for operation in compressed_operations:
+                    results.append({
+                        "host_id": operation.get("aid", host_id),
+                        "file_name": operation.get("FileName", ""),
+                        "file_path": operation.get("FilePath", ""),
+                        "process_name": operation.get("ContextBaseFileName", ""),
+                        "process_id": operation.get("ContextProcessId", ""),
+                        "command_line": operation.get("CommandLine", ""),
+                        "event_type": operation.get("#event_simpleName", ""),
+                        "timestamp": operation.get("timestamp", "")
+                    })
+
+                return {
+                    "success": True,
+                    "host_id": host_id,
+                    "total_results": len(results),
+                    "results": results
+                }
+
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+
         # 注意: 戻り値は不要です（デコレータが勝手にmcpに登録してくれるため）
