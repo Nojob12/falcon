@@ -248,7 +248,7 @@ class FileInvestigation(InvestigationBase):
         query.have("ScriptContent")
         query.select([
             "timestamp", "aid", "#event_simpleName", "FileName",
-            "FilePath", "SHA256HashData"
+            "FilePath", "ScriptContent"
         ])
 
         return await self.execute_query(query, **search_params)
