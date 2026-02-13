@@ -19,7 +19,7 @@ class CaseCondition:
     使用例:
         >>> case1 = CaseCondition()
         >>> case1.when(Query().add("#event_simpleName", "ProcessRollup2"))
-        >>> case1.then_rename("ProcessId", "ContextProcessId")
+        >>> case1.then_rename("ContextProcessId", "ProcessId")
     """
 
     def __init__(self):
@@ -44,13 +44,13 @@ class CaseCondition:
         self._condition_query = query
         return self
 
-    def then_rename(self, new_name: str, old_name: str) -> 'CaseCondition':
+    def then_rename(self, old_name: str, new_name: str) -> 'CaseCondition':
         """
         アクション: フィールド名を変更
 
         Args:
-            new_name: 新しいフィールド名
             old_name: 元のフィールド名
+            new_name: 新しいフィールド名
 
         Returns:
             自身のインスタンス（メソッドチェーン用）
@@ -58,7 +58,7 @@ class CaseCondition:
         例:
             >>> case = CaseCondition()
             >>> case.when(Query().add("#event_simpleName", "ProcessRollup2"))
-            >>> case.then_rename("ProcessId", "ContextProcessId")
+            >>> case.then_rename("ContextProcessId", "ProcessId")
         """
         self._actions.append(f"{new_name} := rename({old_name})")
         return self
@@ -279,14 +279,14 @@ class Query:
         self._in_functions.append(in_function)
         return self
 
-    def rename(self, new_name: str, old_name: str) -> 'Query':
+    def rename(self, old_name: str, new_name: str) -> 'Query':
         """
         指定したフィールドを別のフィールド名に置き換える
         パイプ（|）の後に関数として付与される
 
         Args:
-            new_name: 新しいフィールド名
             old_name: 元のフィールド名
+            new_name: 新しいフィールド名
 
         Returns:
             自身のインスタンス（メソッドチェーン用）
@@ -295,7 +295,7 @@ class Query:
             >>> query = Query()
             >>> query.add("aid", "1234fdfadg")
             >>> query.add("FileName", "malware.exe")
-            >>> query.rename("ProcessId", "ContextProcessId")
+            >>> query.rename("ContextProcessId", "ProcessId")
             >>> query.select(["aid", "FileName", "ProcessId"])
             >>> # 結果: aid="1234fdfadg" AND FileName="malware.exe" | ProcessId := rename(ContextProcessId) | select([aid, FileName, ProcessId])
         """
@@ -317,12 +317,12 @@ class Query:
             >>> # case1: ProcessRollup2の場合
             >>> case1 = CaseCondition()
             >>> case1.when(Query().add("#event_simpleName", "ProcessRollup2"))
-            >>> case1.then_rename("ProcessId", "ContextProcessId")
+            >>> case1.then_rename("ContextProcessId", "ProcessId")
             >>>
             >>> # case2: それ以外の場合
             >>> case2 = CaseCondition()
             >>> case2.when(Query().contain("#event_simpleName", "*"))
-            >>> case2.then_rename("ProcessId", "TargetProcessId")
+            >>> case2.then_rename("TargetProcessId", "ProcessId")
             >>>
             >>> # メインクエリ
             >>> query = Query()

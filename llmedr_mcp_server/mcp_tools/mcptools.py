@@ -119,12 +119,12 @@ class MCPTool(ToolBase):
                 return {
                     "success": True,
                     "host_id": first_result.get("aid", host_id),
-                    "file_name": first_result.get("FileName", ""),
-                    "file_path": first_result.get("FilePath", ""),
+                    "process_name": first_result.get("ProcessName", ""),
+                    "process_path": first_result.get("ProcessPath", ""),
                     "hash_value": first_result.get("SHA256HashData", ""),
-                    "process_id": first_result.get("TargetProcessId", process_id),
+                    "process_id": first_result.get("ProcessId", process_id),
                     "command_line": first_result.get("CommandLine", ""),
-                    "parent_process": first_result.get("ParentBaseFileName", ""),
+                    "parent_process_name": first_result.get("ParentProcessName", ""),
                     "parent_process_id": first_result.get("ParentProcessId", ""),
                     "timestamp": first_result.get("timestamp", ""),
                     "total_results": len(process_details)
@@ -309,7 +309,7 @@ class MCPTool(ToolBase):
 
                 # 2. FileInvestigationクラスを使ってモジュールローダープロセスを取得
                 file_inv = FileInvestigation(client)
-                loader_processes = await file_inv.get_module_loader_by_filename(
+                loader_processes = await file_inv.get_module_loader(
                     filename=file_name,
                     aid=host_id,
                     start=search_period
@@ -326,10 +326,11 @@ class MCPTool(ToolBase):
                 for process_info in loader_processes:
                     results.append({
                         "host_id": process_info.get("aid", ""),
-                        "process_id": process_info.get("ContextProcessId", ""),
-                        "process_name": process_info.get("ContextBaseFileName", ""),
+                        "process_id": process_info.get("ProcessId", ""),
+                        "process_name": process_info.get("ProcessName", ""),
                         "file_path": process_info.get("FilePath", ""),
-                        "file_name": process_info.get("FileName", file_name),
+                        "file_name": process_info.get("FileName", ""),
+                        "hash_value": process_info.get("SHA256HashData", hash_value),
                         "timestamp": process_info.get("timestamp", "")
                     })
 
@@ -379,7 +380,7 @@ class MCPTool(ToolBase):
 
                 # 2. FileInvestigationクラスを使ってモジュールローダープロセスを取得
                 file_inv = FileInvestigation(client)
-                loader_processes = await file_inv.get_module_loader_by_hash(
+                loader_processes = await file_inv.get_module_loader(
                     hash_value=hash_value,
                     aid=host_id,
                     start=search_period
@@ -396,8 +397,8 @@ class MCPTool(ToolBase):
                 for process_info in loader_processes:
                     results.append({
                         "host_id": process_info.get("aid", ""),
-                        "process_id": process_info.get("ContextProcessId", ""),
-                        "process_name": process_info.get("ContextBaseFileName", ""),
+                        "process_id": process_info.get("ProcessId", ""),
+                        "process_name": process_info.get("ProcessName", ""),
                         "file_path": process_info.get("FilePath", ""),
                         "file_name": process_info.get("FileName", ""),
                         "hash_value": process_info.get("SHA256HashData", hash_value),
@@ -450,7 +451,7 @@ class MCPTool(ToolBase):
 
                 # 2. FileInvestigationクラスを使ってファイル作成プロセスを取得
                 file_inv = FileInvestigation(client)
-                creator_processes = await file_inv.get_creator_process_by_filename(
+                creator_processes = await file_inv.get_creator_process(
                     filename=file_name,
                     aid=host_id,
                     start=search_period
@@ -467,11 +468,11 @@ class MCPTool(ToolBase):
                 for process_info in creator_processes:
                     results.append({
                         "host_id": process_info.get("aid", ""),
-                        "process_id": process_info.get("ContextProcessId", ""),
-                        "process_name": process_info.get("ContextBaseFileName", ""),
-                        "command_line": process_info.get("CommandLine", ""),
+                        "process_id": process_info.get("ProcessId", ""),
+                        "process_name": process_info.get("ProcessName", ""),
                         "file_path": process_info.get("FilePath", ""),
-                        "file_name": process_info.get("FileName", file_name),
+                        "file_name": process_info.get("FileName", ""),
+                        "hash_value": process_info.get("SHA256HashData", hash_value),
                         "timestamp": process_info.get("timestamp", "")
                     })
 
@@ -521,7 +522,7 @@ class MCPTool(ToolBase):
 
                 # 2. FileInvestigationクラスを使ってファイル作成プロセスを取得
                 file_inv = FileInvestigation(client)
-                creator_processes = await file_inv.get_creator_process_by_hash(
+                creator_processes = await file_inv.get_creator_process(
                     hash_value=hash_value,
                     aid=host_id,
                     start=search_period
@@ -538,9 +539,8 @@ class MCPTool(ToolBase):
                 for process_info in creator_processes:
                     results.append({
                         "host_id": process_info.get("aid", ""),
-                        "process_id": process_info.get("ContextProcessId", ""),
-                        "process_name": process_info.get("ContextBaseFileName", ""),
-                        "command_line": process_info.get("CommandLine", ""),
+                        "process_id": process_info.get("ProcessId", ""),
+                        "process_name": process_info.get("ProcessName", ""),
                         "file_path": process_info.get("FilePath", ""),
                         "file_name": process_info.get("FileName", ""),
                         "hash_value": process_info.get("SHA256HashData", hash_value),
@@ -593,7 +593,7 @@ class MCPTool(ToolBase):
 
                 # 2. FileInvestigationクラスを使ってファイル実行プロセスを取得
                 file_inv = FileInvestigation(client)
-                executor_processes = await file_inv.get_executor_process_by_filename(
+                executor_processes = await file_inv.get_executor_process(
                     filename=file_name,
                     aid=host_id,
                     start=search_period
@@ -611,10 +611,11 @@ class MCPTool(ToolBase):
                     results.append({
                         "host_id": process_info.get("aid", ""),
                         "process_id": process_info.get("TargetProcessId", ""),
-                        "process_name": process_info.get("FileName", file_name),
+                        "process_name": process_info.get("ProcessName", ""),
+                        "process_path": process_info.get("ProcessPath", ""),
                         "command_line": process_info.get("CommandLine", ""),
-                        "file_path": process_info.get("FilePath", ""),
-                        "parent_process": process_info.get("ParentBaseFileName", ""),
+                        "hash_value": process_info.get("SHA256HashData", hash_value),
+                        "parent_process_name": process_info.get("ParentProcessName", ""),
                         "parent_process_id": process_info.get("ParentProcessId", ""),
                         "timestamp": process_info.get("timestamp", "")
                     })
@@ -665,7 +666,7 @@ class MCPTool(ToolBase):
 
                 # 2. FileInvestigationクラスを使ってファイル実行プロセスを取得
                 file_inv = FileInvestigation(client)
-                executor_processes = await file_inv.get_executor_process_by_hash(
+                executor_processes = await file_inv.get_executor_process(
                     hash_value=hash_value,
                     aid=host_id,
                     start=search_period
@@ -683,11 +684,11 @@ class MCPTool(ToolBase):
                     results.append({
                         "host_id": process_info.get("aid", ""),
                         "process_id": process_info.get("TargetProcessId", ""),
-                        "process_name": process_info.get("FileName", ""),
+                        "process_name": process_info.get("ProcessName", ""),
+                        "process_path": process_info.get("ProcessPath", ""),
                         "command_line": process_info.get("CommandLine", ""),
-                        "file_path": process_info.get("FilePath", ""),
                         "hash_value": process_info.get("SHA256HashData", hash_value),
-                        "parent_process": process_info.get("ParentBaseFileName", ""),
+                        "parent_process_name": process_info.get("ParentProcessName", ""),
                         "parent_process_id": process_info.get("ParentProcessId", ""),
                         "timestamp": process_info.get("timestamp", "")
                     })
@@ -738,7 +739,7 @@ class MCPTool(ToolBase):
 
                 # 2. FileInvestigationクラスを使ってダウンロード元URLを取得
                 file_inv = FileInvestigation(client)
-                download_details = await file_inv.get_download_url_by_filename(
+                download_details = await file_inv.get_download_url(
                     filename=file_name,
                     aid=host_id,
                     start=search_period
@@ -754,11 +755,15 @@ class MCPTool(ToolBase):
                 results = []
                 for download_info in download_details:
                     results.append({
+                        "timestamp": download_info.get("timestamp", ""),
+                        "event_type": download_info.get("#event_simpleName", ""),
                         "host_id": download_info.get("aid", ""),
                         "file_path": download_info.get("FilePath", ""),
                         "file_name": download_info.get("FileName", file_name),
+                        "hash_value": download_info.get("SHA256HashData", ""),
                         "download_url": download_info.get("SourceURL", ""),
-                        "timestamp": download_info.get("timestamp", "")
+                        "process_name": download_info.get("ProcessName", ""),
+                        "process_id": download_info.get("ProcessId", "")
                     })
 
                 return {
@@ -807,7 +812,7 @@ class MCPTool(ToolBase):
 
                 # 2. FileInvestigationクラスを使ってダウンロード元URLを取得
                 file_inv = FileInvestigation(client)
-                download_details = await file_inv.get_download_url_by_hash(
+                download_details = await file_inv.get_download_url(
                     hash_value=hash_value,
                     aid=host_id,
                     start=search_period
@@ -823,12 +828,15 @@ class MCPTool(ToolBase):
                 results = []
                 for download_info in download_details:
                     results.append({
+                        "timestamp": download_info.get("timestamp", ""),
+                        "event_type": download_info.get("#event_simpleName", ""),
                         "host_id": download_info.get("aid", ""),
                         "file_path": download_info.get("FilePath", ""),
                         "file_name": download_info.get("FileName", ""),
                         "hash_value": download_info.get("SHA256HashData", hash_value),
                         "download_url": download_info.get("SourceURL", ""),
-                        "timestamp": download_info.get("timestamp", "")
+                        "process_name": download_info.get("ProcessName", ""),
+                        "process_id": download_info.get("ProcessId", "")
                     })
 
                 return {
@@ -891,14 +899,13 @@ class MCPTool(ToolBase):
                 results = []
                 for operation in compressed_operations:
                     results.append({
-                        "host_id": operation.get("aid", host_id),
-                        "file_name": operation.get("FileName", ""),
-                        "file_path": operation.get("FilePath", ""),
-                        "process_name": operation.get("ContextBaseFileName", ""),
-                        "process_id": operation.get("ContextProcessId", ""),
-                        "command_line": operation.get("CommandLine", ""),
+                        "timestamp": operation.get("timestamp", ""),
                         "event_type": operation.get("#event_simpleName", ""),
-                        "timestamp": operation.get("timestamp", "")
+                        "host_id": operation.get("aid", host_id),
+                        "file_name": operation.get("ProcessName", ""),
+                        "file_path": operation.get("ProcessId", ""),
+                        "process_name": operation.get("CompressedFile", ""),
+                        "command_line": operation.get("CommandLine", "")
                     })
 
                 return {
@@ -913,5 +920,3 @@ class MCPTool(ToolBase):
                     "success": False,
                     "error": str(e)
                 }
-
-        # 注意: 戻り値は不要です（デコレータが勝手にmcpに登録してくれるため）

@@ -229,14 +229,14 @@ query13.add_subquery(compressed_query)
 # ProcessRollup2の場合
 case1 = CaseCondition().when(
     Query().contain("#event_simpleName", "ProcessRollup2")
-).then_rename("ProcessId", "TargetProcessId").then_rename("ProcessName", "FileName")
+).then_rename("TargetProcessId", "ProcessId").then_rename("FileName", "ProcessName")
 
 # それ以外の場合
 case2 = CaseCondition().when(
     Query().add("#event_simpleName", "*")
-).then_rename("ProcessId", "ContextProcessId").then_rename(
-    "CompressedFile", "FileName"
-).then_rename("ProcessName", "ContextBaseFileName")
+).then_rename("ContextProcessId", "ProcessId").then_rename(
+    "FileName", "CompressedFile"
+).then_rename("ContextBaseFileName", "ProcessName")
 
 # case文とselectを追加
 query13.case(case1, case2)

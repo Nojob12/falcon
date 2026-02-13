@@ -147,6 +147,10 @@ class ProcessInvestigation(InvestigationBase):
         query.add("aid", aid)
         query.add("TargetProcessId", process_id)
         query.contain("#event_simpleName", "ProcessRollup2")
+        query.rename("TargetProcessId", "ProcessId")
+        query.rename("FileName", "ProcessName")
+        query.rename("FilePath", "ProcessPath")
+        query.rename("ParentBaseFileName", "ParentProcessName")
         query.select([
             "timestamp", "aid", "FilePath", "FileName", "TargetProcessId",
             "CommandLine", "ParentBaseFileName", "ParentProcessId"

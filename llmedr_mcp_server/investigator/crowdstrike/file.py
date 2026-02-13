@@ -64,18 +64,20 @@ class FileInvestigation(InvestigationBase):
     # ファイル作成関連
     # ========================================
 
-    async def get_creator_process_by_filename(
+    async def get_creator_process(
         self,
-        filename: str,
+        filename: Optional[str] = None,
+        hash_value: Optional[str] = None,
         aid: Optional[str] = None,
         exclude: bool = False,
         **search_params
     ) -> List[Dict[str, Any]]:
         """
-        ファイル名から、そのファイルを作成したプロセスを検索
+        ファイル名またはハッシュ値から、そのファイルを作成したプロセスを検索
 
         Args:
-            filename: 検索対象のファイル名
+            filename: 検索対象のファイル名（hash_valueと排他的）
+            hash_value: SHA256ハッシュ値（filenameと排他的）
             aid: ホストID
             exclude: 除外フラグ（デフォルト: False）
             **search_params: 検索パラメータ
@@ -83,53 +85,33 @@ class FileInvestigation(InvestigationBase):
         Returns:
             検索結果のリスト
 
-        対応クエリ: query_examples.py #2
+        Raises:
+            ValueError: filenameとhash_valueの両方が指定された、または両方とも未指定の場合
+
+        対応クエリ: query_examples.py #2, #3
         """
+        # 排他チェック
+        if (filename is None and hash_value is None):
+            raise ValueError("Either filename or hash_value must be specified")
+        if (filename is not None and hash_value is not None):
+            raise ValueError("Cannot specify both filename and hash_value")
+
         query = Query()
 
         if aid is not None:
             query.add("aid", aid, exclude=exclude)
 
-        query.add("FileName", filename)
+        if filename is not None:
+            query.add("FileName", filename)
+        else:
+            query.add("SHA256HashData", hash_value)
+
         query.contain("#event_simpleName", "Written")
+        query.rename("ContextProcessId", "ProcessId")
+        query.rename("ContextbaseFileName", "ProcessName")
         query.select([
             "timestamp", "aid", "#event_simpleName", "FilePath", "FileName",
-            "ContextProcessId", "ContextBaseFileName", "ContextImageFileName"
-        ])
-
-        return await self.execute_query(query, **search_params)
-
-    async def get_creator_process_by_hash(
-        self,
-        file_hash: str,
-        aid: Optional[str] = None,
-        exclude: bool = False,
-        **search_params
-    ) -> List[Dict[str, Any]]:
-        """
-        ハッシュ値から、そのファイルを作成したプロセスを検索
-
-        Args:
-            file_hash: SHA256ハッシュ値
-            aid: ホストID
-            exclude: 除外フラグ（デフォルト: False）
-            **search_params: 検索パラメータ
-
-        Returns:
-            検索結果のリスト
-
-        対応クエリ: query_examples.py #3
-        """
-        query = Query()
-
-        if aid is not None:
-            query.add("aid", aid, exclude=exclude)
-
-        query.add("SHA256HashData", file_hash)
-        query.contain("#event_simpleName", "Written")
-        query.select([
-            "timestamp", "aid", "#event_simpleName", "FilePath", "FileName",
-            "ContextProcessId", "ContextBaseFileName", "ContextImageFileName"
+            "ProcessId", "ProcessName", "SHA256HashData"
         ])
 
         return await self.execute_query(query, **search_params)
@@ -138,18 +120,20 @@ class FileInvestigation(InvestigationBase):
     # ファイル実行関連
     # ========================================
 
-    async def get_executor_process_by_filename(
+    async def get_executor_process(
         self,
-        filename: str,
+        filename: Optional[str] = None,
+        hash_value: Optional[str] = None,
         aid: Optional[str] = None,
         exclude: bool = False,
         **search_params
     ) -> List[Dict[str, Any]]:
         """
-        ファイル名から、そのファイルを実行したプロセスを検索
+        ファイル名またはハッシュ値から、そのファイルを実行したプロセスを検索
 
         Args:
-            filename: 検索対象のファイル名
+            filename: 検索対象のファイル名（hash_valueと排他的）
+            hash_value: SHA256ハッシュ値（filenameと排他的）
             aid: ホストID
             exclude: 除外フラグ（デフォルト: False）
             **search_params: 検索パラメータ
@@ -157,8 +141,17 @@ class FileInvestigation(InvestigationBase):
         Returns:
             検索結果のリスト
 
-        対応クエリ: query_examples.py #4
+        Raises:
+            ValueError: filenameとhash_valueの両方が指定された、または両方とも未指定の場合
+
+        対応クエリ: query_examples.py #4, #5
         """
+        # 排他チェック
+        if (filename is None and hash_value is None):
+            raise ValueError("Either filename or hash_value must be specified")
+        if (filename is not None and hash_value is not None):
+            raise ValueError("Cannot specify both filename and hash_value")
+
         query = Query()
 
         if aid is not None:
@@ -166,50 +159,22 @@ class FileInvestigation(InvestigationBase):
 
         query.contain("#event_simpleName", "ProcessRollup2")
 
-        # サブクエリ: FileName=ファイル名 OR CommandLineにファイル名を含む
-        sub_query = Query(operator="OR")
-        sub_query.add("FileName", filename)
-        sub_query.contain("CommandLine", filename)
+        if filename is not None:
+            # サブクエリ: FileName=ファイル名 OR CommandLineにファイル名を含む
+            sub_query = Query(operator="OR")
+            sub_query.add("FileName", filename)
+            sub_query.contain("CommandLine", filename)
+            query.add_subquery(sub_query)
+        else:
+            query.add("SHA256HashData", hash_value)
 
-        query.add_subquery(sub_query)
+        query.rename("TargetProcessId", "ProcessId")
+        query.rename("FileName", "ProcessName")
+        query.rename("FilePath", "ProcessPath")
+        query.rename("ParentBaseFileName", "ParentProcessName")
         query.select([
-            "timestamp", "aid", "FilePath", "FileName", "TargetProcessId",
-            "CommandLine", "ParentBaseFileName", "ParentProcessId"
-        ])
-
-        return await self.execute_query(query, **search_params)
-
-    async def get_executor_process_by_hash(
-        self,
-        file_hash: str,
-        aid: Optional[str] = None,
-        exclude: bool = False,
-        **search_params
-    ) -> List[Dict[str, Any]]:
-        """
-        ハッシュ値から、そのファイルを実行したプロセスを検索
-
-        Args:
-            file_hash: SHA256ハッシュ値
-            aid: ホストID
-            exclude: 除外フラグ（デフォルト: False）
-            **search_params: 検索パラメータ
-
-        Returns:
-            検索結果のリスト
-
-        対応クエリ: query_examples.py #5
-        """
-        query = Query()
-
-        if aid is not None:
-            query.add("aid", aid, exclude=exclude)
-
-        query.add("SHA256HashData", file_hash)
-        query.contain("#event_simpleName", "ProcessRollup2")
-        query.select([
-            "timestamp", "aid", "FilePath", "FileName", "TargetProcessId",
-            "CommandLine", "ParentBaseFileName", "ParentProcessId"
+            "timestamp", "aid", "ProcessPath", "ProcessName", "ProcessId",
+            "CommandLine","SHA256HashData", "ParentProcessName", "ParentProcessId"
         ])
 
         return await self.execute_query(query, **search_params)
@@ -257,18 +222,20 @@ class FileInvestigation(InvestigationBase):
     # モジュールロード関連
     # ========================================
 
-    async def get_module_loader_by_filename(
+    async def get_module_loader(
         self,
-        filename: str,
+        filename: Optional[str] = None,
+        hash_value: Optional[str] = None,
         aid: Optional[str] = None,
         exclude: bool = False,
         **search_params
     ) -> List[Dict[str, Any]]:
         """
-        ファイル名から、そのファイルをロードしているプロセスを検索
+        ファイル名またはハッシュ値から、そのファイルをロードしているプロセスを検索
 
         Args:
-            filename: 検索対象のファイル名
+            filename: 検索対象のファイル名（hash_valueと排他的）
+            hash_value: SHA256ハッシュ値（filenameと排他的）
             aid: ホストID
             exclude: 除外フラグ（デフォルト: False）
             **search_params: 検索パラメータ
@@ -276,53 +243,34 @@ class FileInvestigation(InvestigationBase):
         Returns:
             検索結果のリスト
 
-        対応クエリ: query_examples.py #8
+        Raises:
+            ValueError: filenameとhash_valueの両方が指定された、または両方とも未指定の場合
+
+        対応クエリ: query_examples.py #8, #9
         """
+        # 排他チェック
+        if (filename is None and hash_value is None):
+            raise ValueError("Either filename or hash_value must be specified")
+        if (filename is not None and hash_value is not None):
+            raise ValueError("Cannot specify both filename and hash_value")
+
         query = Query()
 
         if aid is not None:
             query.add("aid", aid, exclude=exclude)
 
         query.add("#event_simpleName", "ClassifiedModuleLoad")
-        query.add("FileName", filename)
+
+        if filename is not None:
+            query.add("FileName", filename)
+        else:
+            query.add("SHA256HashData", hash_value)
+
+        query.rename("ContextProcessId", "ProcessId")
+        query.rename("ContextBaseFileName", "ProcessName")
         query.select([
-            "timestamp", "aid", "FilePath", "FileName", "TargetProcessId",
-            "CommandLine", "ParentBaseFileName", "ParentProcessId"
-        ])
-
-        return await self.execute_query(query, **search_params)
-
-    async def get_module_loader_by_hash(
-        self,
-        file_hash: str,
-        aid: Optional[str] = None,
-        exclude: bool = False,
-        **search_params
-    ) -> List[Dict[str, Any]]:
-        """
-        ハッシュ値から、そのファイルをロードしているプロセスを検索
-
-        Args:
-            file_hash: SHA256ハッシュ値
-            aid: ホストID
-            exclude: 除外フラグ（デフォルト: False）
-            **search_params: 検索パラメータ
-
-        Returns:
-            検索結果のリスト
-
-        対応クエリ: query_examples.py #9
-        """
-        query = Query()
-
-        if aid is not None:
-            query.add("aid", aid, exclude=exclude)
-
-        query.add("#event_simpleName", "ClassifiedModuleLoad")
-        query.add("SHA256HashData", file_hash)
-        query.select([
-            "timestamp", "aid", "FilePath", "FileName", "TargetProcessId",
-            "CommandLine", "ParentBaseFileName", "ParentProcessId"
+            "timestamp", "aid", "FilePath", "FileName",
+            "ProcessName", "ProcessId", "SHA256HashData"
         ])
 
         return await self.execute_query(query, **search_params)
@@ -331,18 +279,20 @@ class FileInvestigation(InvestigationBase):
     # ダウンロード関連
     # ========================================
 
-    async def get_download_url_by_filename(
+    async def get_download_url(
         self,
-        filename: str,
+        filename: Optional[str] = None,
+        hash_value: Optional[str] = None,
         aid: Optional[str] = None,
         exclude: bool = False,
         **search_params
     ) -> List[Dict[str, Any]]:
         """
-        ファイル名から、ダウンロード元URLを特定
+        ファイル名またはハッシュ値から、ダウンロード元URLを特定
 
         Args:
-            filename: 検索対象のファイル名
+            filename: 検索対象のファイル名（hash_valueと排他的）
+            hash_value: SHA256ハッシュ値（filenameと排他的）
             aid: ホストID
             exclude: 除外フラグ（デフォルト: False）
             **search_params: 検索パラメータ
@@ -350,14 +300,26 @@ class FileInvestigation(InvestigationBase):
         Returns:
             検索結果のリスト
 
-        対応クエリ: query_examples.py #11
+        Raises:
+            ValueError: filenameとhash_valueの両方が指定された、または両方とも未指定の場合
+
+        対応クエリ: query_examples.py #11, #12
         """
+        # 排他チェック
+        if (filename is None and hash_value is None):
+            raise ValueError("Either filename or hash_value must be specified")
+        if (filename is not None and hash_value is not None):
+            raise ValueError("Cannot specify both filename and hash_value")
+
         query = Query()
 
         if aid is not None:
             query.add("aid", aid, exclude=exclude)
 
-        query.add("FileName", filename)
+        if filename is not None:
+            query.add("FileName", filename)
+        else:
+            query.add("SHA256HashData", hash_value)
 
         # サブクエリ: HostUrl または ReferrerUrl を持つ
         sub_query = Query(operator="OR")
@@ -365,52 +327,13 @@ class FileInvestigation(InvestigationBase):
         sub_query.have("ReferrerUrl")
 
         query.add_subquery(sub_query)
+        query.rename("HostUrl", "SourceUrl")
+        query.rename("ReferrerUrl", "SourceUrl")
+        query.rename("ContextProcessId", "ProcessId")
+        query.rename("ContextBaseFileName", "ProcessName")
         query.select([
             "timestamp", "aid", "#event_simpleName", "FilePath", "FileName",
-            "HostUrl", "ReferrerUrl", "ContextProcessId", "ContextBaseFileName",
-            "ContextImageFileName"
-        ])
-
-        return await self.execute_query(query, **search_params)
-
-    async def get_download_url_by_hash(
-        self,
-        file_hash: str,
-        aid: Optional[str] = None,
-        exclude: bool = False,
-        **search_params
-    ) -> List[Dict[str, Any]]:
-        """
-        ハッシュ値から、ダウンロード元URLを特定
-
-        Args:
-            file_hash: SHA256ハッシュ値
-            aid: ホストID
-            exclude: 除外フラグ（デフォルト: False）
-            **search_params: 検索パラメータ
-
-        Returns:
-            検索結果のリスト
-
-        対応クエリ: query_examples.py #12
-        """
-        query = Query()
-
-        if aid is not None:
-            query.add("aid", aid, exclude=exclude)
-
-        query.add("SHA256HashData", file_hash)
-
-        # サブクエリ: HostUrl または ReferrerUrl を持つ
-        sub_query = Query(operator="OR")
-        sub_query.have("HostUrl")
-        sub_query.have("ReferrerUrl")
-
-        query.add_subquery(sub_query)
-        query.select([
-            "timestamp", "aid", "#event_simpleName", "FilePath", "FileName",
-            "HostUrl", "ReferrerUrl", "ContextProcessId", "ContextBaseFileName",
-            "ContextImageFileName"
+            "SourceUrl", "ProcessId", "ProcessName",
         ])
 
         return await self.execute_query(query, **search_params)
@@ -458,14 +381,14 @@ class FileInvestigation(InvestigationBase):
         # ProcessRollup2の場合
         case1 = CaseCondition().when(
             Query().contain("#event_simpleName", "ProcessRollup2")
-        ).then_rename("ProcessId", "TargetProcessId").then_rename("ProcessName", "FileName")
+        ).then_rename("TargetProcessId", "ProcessId").then_rename("FileName", "ProcessName")
 
         # それ以外の場合
         case2 = CaseCondition().when(
             Query().add("#event_simpleName", "*")
-        ).then_rename("ProcessId", "ContextProcessId").then_rename(
-            "CompressedFile", "FileName"
-        ).then_rename("ProcessName", "ContextBaseFileName")
+        ).then_rename("ContextProcessId", "ProcessId").then_rename(
+            "FileName", "CompressedFile"
+        ).then_rename("ContextBaseFileName", "ProcessName")
 
         # case文とselectを追加
         query.case(case1, case2)
