@@ -1058,8 +1058,8 @@ class MCPTool(ToolBase):
                 search_period: Time range to search (default: "7d"). Format: "1h", "24h", "7d", "30d"
 
             Returns:
-                Dict with four categories: created_files, deleted_files, opened_files, renamed_files,
-                each with total_results and results list
+                Dict with five categories: created_files, deleted_files, opened_files, renamed_files,
+                created_directories, each with total_results and results list
             """
             try:
                 # 1. ClientManagerを使って顧客コード毎のFalconClientを取得
@@ -1096,7 +1096,14 @@ class MCPTool(ToolBase):
                     **search_params
                 )
 
-                def format_file_info(records, include_source_name=False):
+                # 6. 作成ディレクトリ一覧を取得
+                created_dir_records = await proc_inv.get_created_directories_by_pid(
+                    process_id=process_id,
+                    aid=host_id,
+                    **search_params
+                )
+
+                def format_file_info(records, include_source_name=False, include_hash=True):
                     results = []
                     for file_info in (records or []):
                         entry = {
@@ -1104,15 +1111,16 @@ class MCPTool(ToolBase):
                             "event_type": file_info.get("#event_simpleName", ""),
                             "file_name": file_info.get("FileName", ""),
                             "file_path": file_info.get("FilePath", ""),
-                            "hash_value": file_info.get("SHA256HashData", ""),
                             "timestamp": file_info.get("timestamp", "")
                         }
+                        if include_hash:
+                            entry["hash_value"] = file_info.get("SHA256HashData", "")
                         if include_source_name:
                             entry["source_file_name"] = file_info.get("SourceFileName", "")
                         results.append(entry)
                     return results
 
-                # 6. 全ファイル操作のログ情報を返す
+                # 7. 全ファイル・ディレクトリ操作のログ情報を返す
                 return {
                     "success": True,
                     "host_id": host_id,
@@ -1132,6 +1140,10 @@ class MCPTool(ToolBase):
                     "renamed_files": {
                         "total_results": len(renamed_records or []),
                         "results": format_file_info(renamed_records, include_source_name=True)
+                    },
+                    "created_directories": {
+                        "total_results": len(created_dir_records or []),
+                        "results": format_file_info(created_dir_records, include_hash=False)
                     }
                 }
 
