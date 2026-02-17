@@ -159,6 +159,244 @@ class ProcessInvestigation(InvestigationBase):
         return await self.execute_query(query, **search_params)
 
     # ========================================
+    # プロセスID起点の調査関連
+    # ========================================
+
+    async def get_child_processes_by_pid(
+        self,
+        process_id: str,
+        aid: str,
+        **search_params
+    ) -> List[Dict[str, Any]]:
+        """
+        プロセスIDから、そのプロセスが生成した子プロセス一覧を検索
+
+        Args:
+            process_id: 親プロセスID
+            aid: ホストID（必須）
+            **search_params: 検索パラメータ
+
+        Returns:
+            検索結果のリスト
+        """
+        query = Query()
+        query.add("aid", aid)
+        query.add("ParentProcessId", process_id)
+        query.contain("#event_simpleName", "ProcessRollup2")
+        query.select([
+            "timestamp", "aid", "FilePath", "FileName",
+            "TargetProcessId", "CommandLine", "SHA256HashData"
+        ])
+
+        return await self.execute_query(query, **search_params)
+
+    async def get_dns_requests_by_pid(
+        self,
+        process_id: str,
+        aid: str,
+        **search_params
+    ) -> List[Dict[str, Any]]:
+        """
+        プロセスIDから、そのプロセスが行った名前解決一覧を検索
+
+        Args:
+            process_id: ターゲットプロセスID
+            aid: ホストID（必須）
+            **search_params: 検索パラメータ
+
+        Returns:
+            検索結果のリスト
+        """
+        query = Query()
+        query.add("aid", aid)
+        query.add("ContextProcessId", process_id)
+        query.add("#event_simpleName", "DnsRequest")
+        query.select([
+            "timestamp", "aid", "DomainName", "IP4Records", "IP6Records"
+        ])
+
+        return await self.execute_query(query, **search_params)
+
+    async def get_network_connections_by_pid(
+        self,
+        process_id: str,
+        aid: str,
+        **search_params
+    ) -> List[Dict[str, Any]]:
+        """
+        プロセスIDから、そのプロセスが行った通信先を検索
+
+        Args:
+            process_id: ターゲットプロセスID
+            aid: ホストID（必須）
+            **search_params: 検索パラメータ
+
+        Returns:
+            検索結果のリスト
+        """
+        query = Query()
+        query.add("aid", aid)
+        query.add("ContextProcessId", process_id)
+        query.contain("#event_simpleName", "Network")
+        query.select([
+            "timestamp", "aid", "DomainName", "LocalIP", "LPort", "RemoteIP", "RPort"
+        ])
+
+        return await self.execute_query(query, **search_params)
+
+    async def get_created_files_by_pid(
+        self,
+        process_id: str,
+        aid: str,
+        **search_params
+    ) -> List[Dict[str, Any]]:
+        """
+        プロセスIDから、そのプロセスが作成したファイルを検索
+
+        Args:
+            process_id: ターゲットプロセスID
+            aid: ホストID（必須）
+            **search_params: 検索パラメータ
+
+        Returns:
+            検索結果のリスト
+        """
+        query = Query()
+        query.add("aid", aid)
+        query.add("ContextProcessId", process_id)
+
+        # #event_simpleNameに「Written」を含むもしくは「FileCreateInfo」と一致
+        sub_query = Query(operator="OR")
+        sub_query.contain("#event_simpleName", "Written")
+        sub_query.add("#event_simpleName", "FileCreateInfo")
+        query.add_subquery(sub_query)
+
+        query.select([
+            "timestamp", "aid", "#event_simpleName",
+            "FileName", "FilePath", "SHA256HashData"
+        ])
+
+        return await self.execute_query(query, **search_params)
+
+    async def get_deleted_files_by_pid(
+        self,
+        process_id: str,
+        aid: str,
+        **search_params
+    ) -> List[Dict[str, Any]]:
+        """
+        プロセスIDから、そのプロセスが削除したファイルを検索
+
+        Args:
+            process_id: ターゲットプロセスID
+            aid: ホストID（必須）
+            **search_params: 検索パラメータ
+
+        Returns:
+            検索結果のリスト
+        """
+        query = Query()
+        query.add("aid", aid)
+        query.add("ContextProcessId", process_id)
+
+        # #event_simpleNameに「Deleted」を含むもしくは「FileDeleteInfo」と一致
+        sub_query = Query(operator="OR")
+        sub_query.contain("#event_simpleName", "Deleted")
+        sub_query.add("#event_simpleName", "FileDeleteInfo")
+        query.add_subquery(sub_query)
+
+        query.select([
+            "timestamp", "aid", "#event_simpleName",
+            "FileName", "FilePath", "SHA256HashData"
+        ])
+
+        return await self.execute_query(query, **search_params)
+
+    async def get_opened_files_by_pid(
+        self,
+        process_id: str,
+        aid: str,
+        **search_params
+    ) -> List[Dict[str, Any]]:
+        """
+        プロセスIDから、そのプロセスがオープンしたファイルを検索
+
+        Args:
+            process_id: ターゲットプロセスID
+            aid: ホストID（必須）
+            **search_params: 検索パラメータ
+
+        Returns:
+            検索結果のリスト
+        """
+        query = Query()
+        query.add("aid", aid)
+        query.add("ContextProcessId", process_id)
+        query.add("#event_simpleName", "FileOpenInfo")
+        query.select([
+            "timestamp", "aid", "#event_simpleName",
+            "FileName", "FilePath", "SHA256HashData"
+        ])
+
+        return await self.execute_query(query, **search_params)
+
+    async def get_renamed_files_by_pid(
+        self,
+        process_id: str,
+        aid: str,
+        **search_params
+    ) -> List[Dict[str, Any]]:
+        """
+        プロセスIDから、そのプロセスが名前変更したファイルを検索
+
+        Args:
+            process_id: ターゲットプロセスID
+            aid: ホストID（必須）
+            **search_params: 検索パラメータ
+
+        Returns:
+            検索結果のリスト
+        """
+        query = Query()
+        query.add("aid", aid)
+        query.add("ContextProcessId", process_id)
+        query.contain("#event_simpleName", "Rename")
+        query.select([
+            "timestamp", "aid", "#event_simpleName",
+            "FileName", "FilePath", "SourceFileName", "SHA256HashData"
+        ])
+
+        return await self.execute_query(query, **search_params)
+
+    async def get_created_directories_by_pid(
+        self,
+        process_id: str,
+        aid: str,
+        **search_params
+    ) -> List[Dict[str, Any]]:
+        """
+        プロセスIDから、そのプロセスが作成したディレクトリを検索
+
+        Args:
+            process_id: ターゲットプロセスID
+            aid: ホストID（必須）
+            **search_params: 検索パラメータ
+
+        Returns:
+            検索結果のリスト
+        """
+        query = Query()
+        query.add("aid", aid)
+        query.add("ContextProcessId", process_id)
+        query.add("#event_simpleName", "DirectoryCreate")
+        query.select([
+            "timestamp", "aid", "#event_simpleName",
+            "FileName", "FilePath"
+        ])
+
+        return await self.execute_query(query, **search_params)
+
+    # ========================================
     # プロセス系統関連（将来拡張）
     # ========================================
 

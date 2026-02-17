@@ -853,6 +853,295 @@ class MCPTool(ToolBase):
                 }
 
         # ========================================
+        # getChildProcessByProcessId: 子プロセス一覧取得ツール
+        # ========================================
+        @mcp.tool()
+        async def getChildProcessByProcessId(
+            customer_id: str,
+            host_id: str,
+            process_id: str,
+            search_period: str = "7d"
+        ) -> dict:
+            """
+            Get list of child processes spawned by a specific process.
+
+            When to use:
+            - You want to understand what processes a suspicious process launched
+            - Investigating process injection or malware that spawns child processes
+            - Tracing execution chains from an initial infected process
+
+            Common questions:
+            - "What processes did PID 12345 create?"
+            - "Did this suspicious process spawn any child processes?"
+
+            Args:
+                customer_id: Customer/tenant identifier (e.g., "customer_001")
+                host_id: CrowdStrike Agent ID (aid) of the target host
+                process_id: Parent process ID to investigate
+                search_period: Time range to search (default: "7d"). Format: "1h", "24h", "7d", "30d"
+
+            Returns:
+                Dict with total_results count and results list containing:
+                host_id, file_name, file_path, process_id, command_line, hash_value, timestamp per child process
+            """
+            try:
+                # 1. ClientManagerを使って顧客コード毎のFalconClientを取得
+                client = client_manager.get_client(customer_id)
+
+                # 2. ProcessInvestigationクラスを使って子プロセス一覧を取得
+                proc_inv = ProcessInvestigation(client)
+                child_processes = await proc_inv.get_child_processes_by_pid(
+                    process_id=process_id,
+                    aid=host_id,
+                    start=search_period
+                )
+
+                if not child_processes:
+                    return {
+                        "success": False,
+                        "error": f"No child processes found for process ID: {process_id}"
+                    }
+
+                # 3. ログ情報を返す
+                results = []
+                for process_info in child_processes:
+                    results.append({
+                        "host_id": process_info.get("aid", host_id),
+                        "file_name": process_info.get("FileName", ""),
+                        "file_path": process_info.get("FilePath", ""),
+                        "process_id": process_info.get("TargetProcessId", ""),
+                        "command_line": process_info.get("CommandLine", ""),
+                        "hash_value": process_info.get("SHA256HashData", ""),
+                        "timestamp": process_info.get("timestamp", "")
+                    })
+
+                return {
+                    "success": True,
+                    "host_id": host_id,
+                    "parent_process_id": process_id,
+                    "total_results": len(results),
+                    "results": results
+                }
+
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+
+        # ========================================
+        # getNetworkTrafficByProcessId: プロセスID起点の通信内容取得ツール
+        # ========================================
+        @mcp.tool()
+        async def getNetworkTrafficByProcessId(
+            customer_id: str,
+            host_id: str,
+            process_id: str,
+            search_period: str = "7d"
+        ) -> dict:
+            """
+            Get all network activity (DNS lookups and connections) performed by a specific process.
+
+            When to use:
+            - Investigating C2 communication from a suspicious process
+            - Finding what domains/IPs a malware process contacted
+            - Analyzing network behavior of a process during an incident
+
+            Common questions:
+            - "What network connections did PID 12345 make?"
+            - "Did this process contact any suspicious domains?"
+            - "What IPs did this malware communicate with?"
+
+            Args:
+                customer_id: Customer/tenant identifier (e.g., "customer_001")
+                host_id: CrowdStrike Agent ID (aid) of the target host
+                process_id: Target process ID to investigate
+                search_period: Time range to search (default: "7d"). Format: "1h", "24h", "7d", "30d"
+
+            Returns:
+                Dict with dns_requests (domain, IPs) and network_connections (local/remote IP, ports),
+                plus total counts for each category
+            """
+            try:
+                # 1. ClientManagerを使って顧客コード毎のFalconClientを取得
+                client = client_manager.get_client(customer_id)
+                proc_inv = ProcessInvestigation(client)
+
+                search_params = {"start": search_period}
+
+                # 2. DNS名前解決一覧を取得
+                dns_records = await proc_inv.get_dns_requests_by_pid(
+                    process_id=process_id,
+                    aid=host_id,
+                    **search_params
+                )
+
+                # 3. 通信先一覧を取得
+                network_records = await proc_inv.get_network_connections_by_pid(
+                    process_id=process_id,
+                    aid=host_id,
+                    **search_params
+                )
+
+                # DNS情報を整形
+                dns_results = []
+                for dns_info in (dns_records or []):
+                    dns_results.append({
+                        "host_id": dns_info.get("aid", host_id),
+                        "domain_name": dns_info.get("DomainName", ""),
+                        "ip4_records": dns_info.get("IP4Records", ""),
+                        "ip6_records": dns_info.get("IP6Records", ""),
+                        "timestamp": dns_info.get("timestamp", "")
+                    })
+
+                # 通信接続情報を整形
+                network_results = []
+                for net_info in (network_records or []):
+                    network_results.append({
+                        "host_id": net_info.get("aid", host_id),
+                        "domain_name": net_info.get("DomainName", ""),
+                        "local_ip": net_info.get("LocalIP", ""),
+                        "local_port": net_info.get("LPort", ""),
+                        "remote_ip": net_info.get("RemoteIP", ""),
+                        "remote_port": net_info.get("RPort", ""),
+                        "timestamp": net_info.get("timestamp", "")
+                    })
+
+                # 4. DNS情報と通信情報を返す
+                return {
+                    "success": True,
+                    "host_id": host_id,
+                    "process_id": process_id,
+                    "dns_requests": {
+                        "total_results": len(dns_results),
+                        "results": dns_results
+                    },
+                    "network_connections": {
+                        "total_results": len(network_results),
+                        "results": network_results
+                    }
+                }
+
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+
+        # ========================================
+        # getFileOperationByProcessId: プロセスID起点のファイル操作取得ツール
+        # ========================================
+        @mcp.tool()
+        async def getFileOperationByProcessId(
+            customer_id: str,
+            host_id: str,
+            process_id: str,
+            search_period: str = "7d"
+        ) -> dict:
+            """
+            Get all file operations (create, delete, open, rename) performed by a specific process.
+
+            When to use:
+            - Analyzing what files a suspicious process touched
+            - Investigating ransomware file encryption or deletion activity
+            - Understanding malware's file system footprint during an incident
+
+            Common questions:
+            - "What files did PID 12345 create or modify?"
+            - "Did this process delete any files?"
+            - "What files were renamed by this suspicious process?"
+
+            Args:
+                customer_id: Customer/tenant identifier (e.g., "customer_001")
+                host_id: CrowdStrike Agent ID (aid) of the target host
+                process_id: Target process ID to investigate
+                search_period: Time range to search (default: "7d"). Format: "1h", "24h", "7d", "30d"
+
+            Returns:
+                Dict with four categories: created_files, deleted_files, opened_files, renamed_files,
+                each with total_results and results list
+            """
+            try:
+                # 1. ClientManagerを使って顧客コード毎のFalconClientを取得
+                client = client_manager.get_client(customer_id)
+                proc_inv = ProcessInvestigation(client)
+
+                search_params = {"start": search_period}
+
+                # 2. 作成ファイル一覧を取得
+                created_records = await proc_inv.get_created_files_by_pid(
+                    process_id=process_id,
+                    aid=host_id,
+                    **search_params
+                )
+
+                # 3. 削除ファイル一覧を取得
+                deleted_records = await proc_inv.get_deleted_files_by_pid(
+                    process_id=process_id,
+                    aid=host_id,
+                    **search_params
+                )
+
+                # 4. オープンファイル一覧を取得
+                opened_records = await proc_inv.get_opened_files_by_pid(
+                    process_id=process_id,
+                    aid=host_id,
+                    **search_params
+                )
+
+                # 5. 名前変更ファイル一覧を取得
+                renamed_records = await proc_inv.get_renamed_files_by_pid(
+                    process_id=process_id,
+                    aid=host_id,
+                    **search_params
+                )
+
+                def format_file_info(records, include_source_name=False):
+                    results = []
+                    for file_info in (records or []):
+                        entry = {
+                            "host_id": file_info.get("aid", host_id),
+                            "event_type": file_info.get("#event_simpleName", ""),
+                            "file_name": file_info.get("FileName", ""),
+                            "file_path": file_info.get("FilePath", ""),
+                            "hash_value": file_info.get("SHA256HashData", ""),
+                            "timestamp": file_info.get("timestamp", "")
+                        }
+                        if include_source_name:
+                            entry["source_file_name"] = file_info.get("SourceFileName", "")
+                        results.append(entry)
+                    return results
+
+                # 6. 全ファイル操作のログ情報を返す
+                return {
+                    "success": True,
+                    "host_id": host_id,
+                    "process_id": process_id,
+                    "created_files": {
+                        "total_results": len(created_records or []),
+                        "results": format_file_info(created_records)
+                    },
+                    "deleted_files": {
+                        "total_results": len(deleted_records or []),
+                        "results": format_file_info(deleted_records)
+                    },
+                    "opened_files": {
+                        "total_results": len(opened_records or []),
+                        "results": format_file_info(opened_records)
+                    },
+                    "renamed_files": {
+                        "total_results": len(renamed_records or []),
+                        "results": format_file_info(renamed_records, include_source_name=True)
+                    }
+                }
+
+            except Exception as e:
+                return {
+                    "success": False,
+                    "error": str(e)
+                }
+
+        # ========================================
         # getCompressedFileOperation: 圧縮ファイル操作取得ツール
         # ========================================
         @mcp.tool()
